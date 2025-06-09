@@ -1,15 +1,16 @@
 
 export interface TradeHistoryModel {
-    id: string | undefined;
-    plan: Plan;
+    id?: string | undefined;
+    symbol: string;
+    totalAssets: number;
+    plan?: Plan | undefined;
     execution: Execution;
     review: string;
+    tradeId: number
 }
 
 
 export interface Plan {
-    symbol: string;
-    totalAssets: number;
     currentPrice: number;
     direction: string;
     slPrice: number;
@@ -21,7 +22,6 @@ export interface Plan {
 }
 
 export interface Execution {
-    symbol: string;
     positionSize: number | undefined;
     direction: string;
     enterPrice: number;
@@ -34,6 +34,10 @@ export interface Execution {
 
 export interface TradeHistoryDocument extends Document {
     plan: Plan;
+    totalAssets: number;
+    symbol: string;
     execution: Execution;
+    tradeId: number;
+    review: string;
     createdAt: Date;
 }

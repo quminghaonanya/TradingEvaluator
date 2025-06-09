@@ -11,11 +11,13 @@ export async function GET(req: Request) {
         const action = searchParams.get('action');
         const id = searchParams.get('id');
         const status = searchParams.get('status');
+        const tradeId = searchParams.get('tradeId');
 
         // Handle COUNT query
         if (action === 'count') {
-            const count = await TradeHistoryModel.countDocuments();
-            return NextResponse.json({ count });
+            const count = await TradeHistoryModel.countDocuments().distinct('tradeId');
+            console.log("countDistinctTradeId: " + count.length);
+            return NextResponse.json({ count: count.length });
         }
 
         // Handle fetch by ID
@@ -29,8 +31,21 @@ export async function GET(req: Request) {
 
         // Handle query by status
         if (status) {
-            const trades = await TradeHistoryModel.find({ 'execution.status': status }).sort({ 'plan.startTimeStamp': -1 });
+            const trades = await TradeHistoryModel.find({ 'execution.status': status }).sort({ 'createdAt': -1 });
             return NextResponse.json(trades);
+        }
+
+        // Handle query by tradeId
+        if (tradeId) {
+            const trades = await TradeHistoryModel.find({ 'tradeId': tradeId }).sort({ 'createdAt': -1 });
+            return NextResponse.json(trades);
+        }
+
+        if (action === 'getNextId') {
+            const tradeIds: number[] = await TradeHistoryModel.countDocuments().distinct('tradeId');
+            const maxId = Math.max(...tradeIds);
+            console.log("nextid: " + maxId);
+            return NextResponse.json({ nextId: maxId + 1 });
         }
 
         // Add more specific queries based on searchParams here as needed
@@ -42,7 +57,7 @@ export async function GET(req: Request) {
         // }
 
         // Default action: Get all trade histories, sorted by plan start time
-        const trades = await TradeHistoryModel.find({}).sort({ 'plan.startTimeStamp': -1 });
+        const trades = await TradeHistoryModel.find({}).sort({ 'createdAt': -1 });
         return NextResponse.json(trades);
     } catch (error) {
         console.error("Error in GET /api/trade-history:", error);

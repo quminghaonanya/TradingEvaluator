@@ -2,14 +2,19 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TradeHistoryModel } from "@/app/dto/TradingHistoryDTO";
 import ReactMarkdown from "react-markdown";
-import { countTradeHistory, updateTradeHistory } from "../client/DbClient";
+import { countTradeHistory, createTradeHistory, updateTradeHistory } from "../client/DbClient";
+import { historyPlan } from "./HistoryPlan";
+import { TEMPLATE } from "../constants";
 
 interface TradingHistoryProps {
     history: TradeHistoryModel[];
+    tradeIdChange: (id: number | undefined) => void;
+    reloadHistory: () => void;
 }
 
-export const TradingHistory: React.FC<TradingHistoryProps> = ({ history }) => {
+export const TradingHistory: React.FC<TradingHistoryProps> = ({ history, tradeIdChange, reloadHistory }) => {
     const [editableHistory, setEditableHistory] = useState(history);
+    const [tradeIdSelected, setTradeIdSelected] = useState<boolean>(false);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
     const handleInputChange = async (field: string, value: string) => {
@@ -34,14 +39,6 @@ export const TradingHistory: React.FC<TradingHistoryProps> = ({ history }) => {
     const tradeDate = (date: number | undefined) => {
         return date ? new Date(date).toISOString().replace(/T/, '-').replace(/\..+/, '') : "";
     }
-    const targetProfit = (direction: string, currentPrice: number, tpPrice: number, positionSize: number) => {
-        return direction === "buy" ? (tpPrice - currentPrice) / currentPrice * positionSize :
-            (currentPrice - tpPrice) / currentPrice * positionSize;
-    }
-    const maxLoss = (direction: string, currentPrice: number, slPrice: number, positionSize: number) => {
-        return direction === "buy" ? (currentPrice - slPrice) / currentPrice * positionSize :
-            (slPrice - currentPrice) / currentPrice * positionSize;
-    }
 
     const pnlPercentage = (direction: string, currentPrice: number, exitPrice: number) => {
         return ((direction === "buy" ? exitPrice - currentPrice : currentPrice - exitPrice) / currentPrice * 100).toFixed(5);
@@ -53,12 +50,69 @@ export const TradingHistory: React.FC<TradingHistoryProps> = ({ history }) => {
             (currentPrice - exitPrice) / currentPrice * positionSize;
     }
 
+    const [reviewingIndex, setReviewingIndex] = useState<number | null>(null);
+    const [reviewText, setReviewText] = useState("");
+
+    const loadReviewTemplate = () => {
+        return TEMPLATE;
+    };
+
+    const handleReviewClick = (idx: number) => {
+        setReviewingIndex(idx);
+        const existingReview = editableHistory[idx]?.review;
+        if (existingReview) {
+            setReviewText(existingReview);
+        } else {
+            const template = loadReviewTemplate();
+            setReviewText(template);
+        }
+    };
+
+    const handleReviewSave = async () => {
+        if (reviewingIndex == null || reviewingIndex == undefined) return;
+        const updated = [...editableHistory];
+        console.log(JSON.stringify(editableHistory));
+        updated[reviewingIndex].review = reviewText;
+        await updateTradeHistory(updated[reviewingIndex]);
+        setEditableHistory(updated);
+        setReviewingIndex(null);
+    };
+
+    const getSymbol = (entry: TradeHistoryModel) => {
+        return entry.symbol || "";
+    }
 
     const [totalTrade, setTotalTrade] = useState(0);
 
     useEffect(() => {
         countTradeHistory().then((count) => setTotalTrade(count));
     }, []);
+
+    useEffect(() => {
+        setEditableHistory(history);
+    }, [history]);
+
+    const handleAddExecution = async (idx: number) => {
+        await createTradeHistory({
+            symbol: editableHistory[idx].symbol,
+            plan: undefined,
+            totalAssets: editableHistory[idx].totalAssets,
+            execution: editableHistory[idx].execution,
+            review: editableHistory[idx].review,
+            tradeId: editableHistory[idx].tradeId
+        });
+        reloadHistory();
+    };
+
+    const handleTradeIdClick = (entry: TradeHistoryModel) => {
+        if (!tradeIdSelected) {
+            tradeIdChange(entry.tradeId);
+        } else {
+            tradeIdChange(undefined);
+        }
+        setTradeIdSelected(!tradeIdSelected);
+    }
+
     return (
         <Card className="h-full max-h-[500px] overflow-y-auto">
             <CardContent className="space-y-4 p-4">
@@ -71,48 +125,54 @@ export const TradingHistory: React.FC<TradingHistoryProps> = ({ history }) => {
                 ) : (
                     history.map((entry, idx) => (
                         <div key={idx} className={`border rounded-lg p-3 shadow-sm space-y-1 ${getCardColor(entry.execution.status)}`}>
-                            <div className="bg-gray-50 p-2 rounded">
-                                <div>
-                                    <div className="flex items-center justify-between space-x-2">
-                                        <div className="font-medium">Plan</div>
-                                        <div className="text-sm text-gray-700 text-right">
-                                            Date: {tradeDate(entry.plan.startTimeStamp)}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="text-sm text-gray-700">
-                                    Symbol: {entry.plan.symbol}<br />
-                                    Total Assets: {entry.plan.totalAssets}<br />
-                                    Position Size: {entry.plan.positionSize}<br />
-                                    Current Price: {entry.plan.currentPrice}<br />
-                                    Direction: {entry.plan.direction}<br />
-                                    Stop Loss: {entry.plan.slPrice} / Max Loss: {maxLoss(entry.plan.direction, entry.plan.currentPrice, entry.plan.slPrice, entry.plan.positionSize)} <br />
-                                    Take Profit: {entry.plan.tpPrice} / Target Profit: {targetProfit(entry.plan.direction, entry.plan.currentPrice, entry.plan.tpPrice, entry.plan.positionSize)} <br />
-                                    Win Ratio: {entry.plan.winRatio}<br />
-
+                            <div className="mb-5">
+                                Symbol: {getSymbol(entry)} - {tradeDate(entry.execution.startTimeStamp)}
+                                <div className="p-2 rounded inline-block float-right">
+                                    <button
+                                        className={`font-semibold px-2 py-1 rounded ${tradeIdSelected ? "bg-blue-100 text-black" : "bg-gray-500 text-white"}`}
+                                        onClick={() => handleTradeIdClick(entry)}
+                                    >
+                                        Trade Id {entry.tradeId}
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className="bg-gray-100 p-2 rounded" onClick={() => setEditingIndex(idx)}>
-                                <div className="font-medium">Execution</div>
-                                <div className="text-sm text-gray-700">
-                                    Symbol: {entry.execution.symbol}<br />
+                            {entry.plan?.startTimeStamp !== undefined && historyPlan(entry.plan)}
+
+                            <div className="bg-gray-100 p-2 rounded" >
+                                <div className="w-full flex items-center justify-between">
+                                    <div className="font-medium">Execution</div>
+                                    <button className="bg-gray-500 text-white px-2 py-1 rounded float-right" onClick={() => handleAddExecution(idx)}>Add</button>
+                                </div>
+
+                                <div className="text-sm text-gray-800" onClick={() => setEditingIndex(idx)}>
                                     Position Size: {entry.execution.positionSize}<br />
                                     Direction: {entry.execution.direction}<br />
                                     Enter Price: {entry.execution.enterPrice}<br />
                                     Exit Price: {entry.execution.exitPrice}<br />
-                                    PnL: {pnlPercentage(entry.execution.direction, entry.plan.currentPrice, entry.execution.exitPrice)} %
-                                    / Pnl Amount: {pnlAmount(entry.execution.direction, entry.plan.currentPrice, entry.execution.exitPrice, entry.execution.positionSize)}<br />
-                                    Execution Start Time: {entry.execution.startTimeStamp}<br />
-                                    Execution End Time: {entry.execution.endTimeStamp}<br />
+                                    PnL: {pnlPercentage(entry.execution.direction, entry.execution.enterPrice, entry.execution.exitPrice)} %
+                                    / Pnl Amount: {pnlAmount(entry.execution.direction, entry.execution.enterPrice, entry.execution.exitPrice, entry.execution.positionSize)}<br />
+                                    Execution Start Time: {tradeDate(entry.execution.startTimeStamp)}<br />
+                                    Execution End Time: {tradeDate(entry.execution.endTimeStamp)}<br />
                                     Remark: {entry.review}
                                 </div>
                             </div>
                             <div className="bg-white p-2 rounded border border-gray-200">
-                                <div className="font-medium mb-1">Review</div>
-                                <div className="prose text-sm text-gray-800">
-                                    <ReactMarkdown>{entry.review}</ReactMarkdown>
+                                <div className="font-medium mb-1 flex justify-between items-center">
+                                    <span>Review</span>
+                                    <button
+                                        onClick={() => handleReviewClick(idx)}
+                                        className="text-blue-500 text- hover:underline"
+                                    >
+                                        {entry.review ? "Edit" : "Add Review"}
+                                    </button>
+                                </div>
+                                <div className="prose prose-sm text-gray-800">
+                                    {entry.review ? (
+                                        <ReactMarkdown>{entry.review}</ReactMarkdown>
+                                    ) : (
+                                        <span className="text-gray-400 italic">Review your last trade</span>
+                                    )}
                                 </div>
                             </div>
 
@@ -165,6 +225,32 @@ export const TradingHistory: React.FC<TradingHistoryProps> = ({ history }) => {
                         </div>
                     </div>
                 )}
+                {reviewingIndex !== null && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-5xl max-h-[90vh] overflow-y-auto space-y-4">
+                            <h2 className="text-xl font-semibold">Review Trade</h2>
+
+                            <textarea
+                                value={reviewText}
+                                onChange={(e) => setReviewText(e.target.value)}
+                                className="w-full h-64 border rounded p-2 font-mono"
+                                placeholder="Write your review in markdown..."
+                            />
+
+                            <div className="text-md text-gray-700 border rounded p-4 bg-gray-50 overflow-auto h-[50vh]">
+                                <div className="prose prose-base max-w-none">
+                                    <ReactMarkdown>{reviewText}</ReactMarkdown>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-2">
+                                <button onClick={() => setReviewingIndex(null)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+                                <button onClick={handleReviewSave} className="px-4 py-2 bg-blue-500 text-white rounded">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
             </CardContent>
         </Card>
     );

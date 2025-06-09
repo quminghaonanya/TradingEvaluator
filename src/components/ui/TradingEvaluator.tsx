@@ -4,10 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TradingHistory } from "./TradingHistory";
-import { countTradeHistory, createTradeHistory, fetchTradeHistory } from "../client/DbClient";
+import { getNextId, createTradeHistory, fetchTradeHistory } from "../client/DbClient";
 import { TradeHistoryModel } from "@/app/dto/TradingHistoryDTO";
 
-const MAX_LOSS_PCT = 0.03;
+const MAX_LOSS_PCT = 0.02;
 const MUST_TP_PCT = 0.3;
 
 function formatNumber(num: number, decimals = 2): string {
@@ -67,7 +67,7 @@ function evaluateTrade(
 
 export default function TradeEvaluator() {
     const [inputs, setInputs] = useState({
-        totalAssets: 49000,
+        totalAssets: 447000,
         currentPrice: 2667,
         direction: "short" as "long" | "short",
         slPrice: 2700,
@@ -77,17 +77,19 @@ export default function TradeEvaluator() {
     const [symbol, setSymbol] = useState("ETHUSDT");
     const [output, setOutput] = useState<string[]>([]);
     const [mode, setMode] = useState<"plan" | "trade">("trade");
-    async function loadHistory() {
+    const [tradeId, setTradeId] = useState<number | undefined>(undefined);
+
+    async function loadHistory(tradeId?: number) {
         try {
-            const data = await fetchTradeHistory();
+            const data = await fetchTradeHistory(tradeId);
             setHistory(data);
         } catch (error) {
             console.error("Error loading trade history:", error);
         }
     }
     useEffect(() => {
-        loadHistory();
-    }, []);
+        loadHistory(tradeId);
+    }, [tradeId]);
     const [history, setHistory] = useState<TradeHistoryModel[]>([]);
     const [canSave, setCanSave] = useState(false);
     const [kellySize, setKellySize] = useState(0);
@@ -124,6 +126,9 @@ export default function TradeEvaluator() {
             direction: prev.direction === "long" ? "short" : "long",
         }));
     };
+    const handleTradeIdChange = (id: number | undefined) => {
+        setTradeId(id);
+    };
 
     const toggleMode = () => {
         setMode((prev) => (prev === "trade" ? "plan" : "trade"));
@@ -147,8 +152,6 @@ export default function TradeEvaluator() {
 
     const savePlan = async () => {
         const plan = {
-            symbol,
-            totalAssets: inputs.totalAssets,
             currentPrice: inputs.currentPrice,
             direction: inputs.direction,
             slPrice: inputs.slPrice,
@@ -172,9 +175,21 @@ export default function TradeEvaluator() {
             remark: ""
         };
 
-        await createTradeHistory({ plan, execution, id: undefined, review: "" });
+        const tradeId = await getNextId();
+        console.log("tradeId: " + tradeId);
+        await createTradeHistory({
+            plan, execution,
+            tradeId: tradeId,
+            review: "",
+            symbol: symbol,
+            totalAssets: inputs.totalAssets,
+        });
         setCanSave(false);
         loadHistory();
+    };
+
+    const reloadHistory = () => {
+        loadHistory(tradeId);
     };
 
     return (
@@ -228,7 +243,7 @@ export default function TradeEvaluator() {
                     </div>
                 </CardContent>
             </Card>
-            <TradingHistory history={history} />
+            <TradingHistory history={history} tradeIdChange={handleTradeIdChange} reloadHistory={reloadHistory} />
 
         </div>
     );

@@ -4,8 +4,6 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 
 const PlanSchema = new Schema<Plan>({
-    symbol: { type: String, required: true },
-    totalAssets: { type: Number, required: true },
     currentPrice: { type: Number, required: true },
     direction: { type: String, required: true },
     slPrice: { type: Number, required: true },
@@ -17,7 +15,7 @@ const PlanSchema = new Schema<Plan>({
 });
 
 const ExecutionSchema = new Schema<Execution>({
-    symbol: { type: String, required: true },
+
     positionSize: { type: Number, required: false },
     direction: { type: String, required: true },
     enterPrice: { type: Number, required: false },
@@ -29,11 +27,15 @@ const ExecutionSchema = new Schema<Execution>({
 
 export const TradeHistorySchema = new Schema<TradeHistoryDocument>(
     {
-        plan: { type: PlanSchema, required: true },
+        totalAssets: { type: Number, required: true },
+        symbol: { type: String, required: true },
+        review: { type: String, required: false },
+        plan: { type: PlanSchema, required: false },
+        tradeId: { type: Number, required: true },
         execution: { type: ExecutionSchema, required: true },
         createdAt: { type: Date, default: Date.now },
     },
-    { collection: 'trade_histories' }
+    { collection: 'trade-history' }
 );
 
 // Define the model using the schema

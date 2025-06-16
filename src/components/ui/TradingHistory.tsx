@@ -101,6 +101,7 @@ export const TradingHistory: React.FC<TradingHistoryProps> = ({ history, tradeId
             review: editableHistory[idx].review,
             tradeId: editableHistory[idx].tradeId
         });
+        tradeIdChange(undefined);
         reloadHistory();
     };
 

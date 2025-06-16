@@ -1,0 +1,31 @@
+{
+    "symbol": "ETHUSDT",
+    "positionSize": 25.25,
+    "direction": "short",
+    "enterPrice": 2607,
+    "exitPrice": 2609,
+    "pnl": 24.1592,
+    "filledTime": new ISODate("2025-06-04T21:30:00.000Z")
+}
+
+{
+    "symbol": "ETHUSDT",
+    "positionSize": new NumberInt("19000"),
+    "direction": "short",
+    "enterPrice": new NumberInt("2674"),
+    "exitPrice": new NumberInt("2660"),
+    "pnl": new NumberInt("0"),
+    "_id": new ObjectId("6840975cacba5da0a7454ea9")
+}
+
+{
+    "symbol": "ETHUSDT",
+    "totalAssets": new NumberInt("10000"),
+    "currentPrice": 2617.96,
+    "direction": "short",
+    "slPrice": new NumberInt("2625"),
+    "tpPrice": new NumberInt("2595"),
+    "winRatio": 0.6,
+    "maxLoss": 0.01,
+    "_id": new ObjectId("683e9f4f7e9d0e74dac567ae")
+}
